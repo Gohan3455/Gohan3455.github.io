@@ -1,5 +1,5 @@
-import type * as I from '../data/interface';
-import type * as D from '@pkmn/dex';
+import * as I from '../data/interface';
+import * as D from '@pkmn/dex';
 
 export function toID(s: string) {
   return ('' + s).toLowerCase().replace(/[^a-z0-9]+/g, '') as I.ID;
@@ -165,10 +165,7 @@ class Move implements I.Move {
   readonly priority?: number;
   readonly self?: I.SelfOrSecondaryEffect | null;
   readonly ignoreDefensive?: boolean;
-  readonly overrideOffensiveStat?: I.StatIDExceptHP;
-  readonly overrideDefensiveStat?: I.StatIDExceptHP;
-  readonly overrideOffensivePokemon?: 'target' | 'source';
-  readonly overrideDefensivePokemon?: 'target' | 'source';
+  readonly defensiveCategory?: I.MoveCategory;
   readonly breaksProtect?: boolean;
   readonly isZ?: boolean;
   readonly zMove?: {
@@ -179,7 +176,6 @@ class Move implements I.Move {
     basePower: number;
   };
   readonly multihit?: number | number[];
-  readonly multiaccuracy?: boolean;
 
   constructor(move: D.Move, dex: D.ModdedDex) {
     this.kind = 'Move';
@@ -187,10 +183,6 @@ class Move implements I.Move {
     this.name = move.name as I.MoveName;
     this.basePower = move.basePower;
     this.type = move.type;
-    this.overrideOffensiveStat = move.overrideOffensiveStat;
-    this.overrideDefensiveStat = move.overrideDefensiveStat;
-    this.overrideOffensivePokemon = move.overrideOffensivePokemon;
-    this.overrideDefensivePokemon = move.overrideDefensivePokemon;
 
     if (move.category === 'Status' || dex.gen >= 4) {
       this.category = move.category;
@@ -207,7 +199,6 @@ class Move implements I.Move {
     }
 
     if (move.multihit) this.multihit = move.multihit;
-    if (move.multiaccuracy) this.multiaccuracy = move.multiaccuracy;
     if (move.drain) this.drain = move.drain;
     if (move.willCrit) this.willCrit = move.willCrit;
     if (move.priority > 0) this.priority = move.priority;
@@ -230,6 +221,9 @@ class Move implements I.Move {
     }
     if (dex.gen >= 5) {
       if (move.ignoreDefensive) this.ignoreDefensive = move.ignoreDefensive;
+      if (move.defensiveCategory && move.defensiveCategory !== move.category) {
+        this.defensiveCategory = move.defensiveCategory;
+      }
 
       if ('secondaries' in move && move.secondaries?.length) {
         this.secondaries = true;
@@ -246,10 +240,6 @@ class Move implements I.Move {
     if (dex.gen >= 8) {
       if (move.isMax) this.isMax = true;
       if (move.maxMove) this.maxMove = {basePower: move.maxMove.basePower};
-    }
-    if (dex.gen >= 9) {
-      if (move.flags.wind) this.flags.wind = move.flags.wind;
-      if (move.flags.slicing) this.flags.slicing = move.flags.slicing;
     }
   }
 }
@@ -315,11 +305,11 @@ class Specie implements I.Specie {
     this.baseStats = species.baseStats;
     this.weightkg = species.weightkg;
 
-    const nfe = !!species.evos?.some((s: string) => exists(dex.species.get(s), dex.gen));
+    const nfe = !!species.evos?.some(s => exists(dex.species.get(s), dex.gen));
     if (nfe) this.nfe = nfe;
     if (species.gender === 'N' && dex.gen > 1) this.gender = species.gender;
 
-    const formes = species.otherFormes?.filter((s: string) => exists(dex.species.get(s), dex.gen));
+    const formes = species.otherFormes?.filter(s => exists(dex.species.get(s), dex.gen));
     if (species.id.startsWith('aegislash')) {
       if (species.id === 'aegislashblade') {
         this.otherFormes = ['Aegislash-Shield', 'Aegislash-Both'] as I.SpeciesName[];
@@ -445,8 +435,8 @@ class Nature implements I.Nature {
   readonly kind: 'Nature';
   readonly id: I.ID;
   readonly name: I.NatureName;
-  readonly plus: I.StatID;
-  readonly minus: I.StatID;
+  readonly plus: I.StatName;
+  readonly minus: I.StatName;
 
   constructor(nature: D.Nature) {
     this.kind = 'Nature';
@@ -490,22 +480,14 @@ const NATDEX_BANNED = [
   'Pikachu-Libre',
   'Pichu-Spiky-eared',
   'Floette-Eternal',
+  'Magearna-Original',
 ];
 
 function exists(val: D.Ability| D.Item | D.Move | D.Species | D.Type, gen: I.GenerationNum) {
   if (!val.exists || val.id === 'noability') return false;
   if (gen === 7 && val.isNonstandard === 'LGPE') return true;
-  if (gen >= 8) {
-    if (gen === 8) {
-      if (('isMax' in val && val.isMax) || val.isNonstandard === 'Gigantamax') return true;
-      if (['eternatuseternamax', 'zarude', 'zarudedada'].includes(val.id)) return true;
-      if (val.isNonstandard === 'Future') return false;
-    }
-    if (val.isNonstandard === 'Past' && !NATDEX_BANNED.includes(val.name)) return true;
-    if (gen > 8 && 'isZ' in val && val.isZ) return false;
-    if (gen > 8 && val.isNonstandard === 'Unobtainable') return true;
-  }
-  if (gen >= 6 && ['floetteeternal'].includes(val.id)) return true;
+  if (gen === 8 && val.isNonstandard === 'Past' && !NATDEX_BANNED.includes(val.name)) return true;
+  if (gen === 8 && ['eternatuseternamax', 'zarude', 'zarudedada'].includes(val.id)) return true;
   // TODO: clean this up with proper Gigantamax support
   if (val.isNonstandard && !['CAP', 'Unobtainable', 'Gigantamax'].includes(val.isNonstandard)) {
     return false;

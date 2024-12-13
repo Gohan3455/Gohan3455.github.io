@@ -1,14 +1,14 @@
 import {Field} from './field';
-import type {Generation} from './data/interface';
-import type {Move} from './move';
-import type {Pokemon} from './pokemon';
-import type {Result} from './result';
+import {Generation} from './data/interface';
+import {Move} from './move';
+import {Pokemon} from './pokemon';
+import {Result} from './result';
 
 import {calculateRBYGSC} from './mechanics/gen12';
 import {calculateADV} from './mechanics/gen3';
 import {calculateDPP} from './mechanics/gen4';
 import {calculateBWXY} from './mechanics/gen56';
-import {calculateSMSSSV} from './mechanics/gen789';
+import {calculateSMSS} from './mechanics/gen78';
 
 const MECHANICS = [
   () => {},
@@ -18,9 +18,8 @@ const MECHANICS = [
   calculateDPP,
   calculateBWXY,
   calculateBWXY,
-  calculateSMSSSV,
-  calculateSMSSSV,
-  calculateSMSSSV,
+  calculateSMSS,
+  calculateSMSS,
 ];
 
 export function calculate(

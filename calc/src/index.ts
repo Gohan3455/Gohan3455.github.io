@@ -44,8 +44,8 @@
 // that the correct loading order being followed.
 
 import {Generations} from './data';
-import type {State} from './state';
-import type * as I from './data/interface';
+import {State} from './state';
+import * as I from './data/interface';
 import * as A from './adaptable';
 
 // The loading strategy outlined in the comment above breaks in the browser when we start reusing
@@ -122,7 +122,7 @@ export class Pokemon extends A.Pokemon {
 
 export function calcStat(
   gen: I.GenerationNum | I.Generation,
-  stat: I.StatID | 'spc',
+  stat: I.StatName | 'spc',
   base: number,
   iv: number,
   ev: number,
@@ -142,10 +142,10 @@ export function calcStat(
 
 export {Field, Side} from './field';
 export {Result} from './result';
-export {type GenerationNum, type StatsTable, type StatID} from './data/interface';
+export {GenerationNum, StatsTable, StatName} from './data/interface';
 export {Generations} from './data/index';
 export {toID} from './util';
-export {type State} from './state';
+export {State} from './state';
 
 export {ABILITIES} from './data/abilities';
 export {ITEMS, MEGA_STONES} from './data/items';

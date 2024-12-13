@@ -1,19 +1,18 @@
-import type {Generation} from '../data/interface';
+import {Generation} from '../data/interface';
 import {getItemBoostType} from '../items';
-import type {RawDesc} from '../desc';
-import type {Pokemon} from '../pokemon';
-import type {Move} from '../move';
-import type {Field} from '../field';
+import {RawDesc} from '../desc';
+import {Pokemon} from '../pokemon';
+import {Move} from '../move';
+import {Field} from '../field';
 import {Result} from '../result';
 import {
   getModifiedStat,
-  getStatDescriptionText,
+  getEVDescriptionText,
   getFinalSpeed,
   getMoveEffectiveness,
   checkAirLock,
   checkForecast,
   checkIntimidate,
-  checkMultihitBoost,
   handleFixedDamageMoves,
 } from './util';
 
@@ -50,13 +49,6 @@ export function calculateADV(
     return result;
   }
 
-  if (move.name === 'Pain Split') {
-    const average = Math.floor((attacker.curHP() + defender.curHP()) / 2);
-    const damage = Math.max(0, defender.curHP() - average);
-    result.damage = damage;
-    return result;
-  }
-
   if (move.named('Weather Ball')) {
     move.type =
       field.hasWeather('Sun') ? 'Fire'
@@ -68,51 +60,16 @@ export function calculateADV(
     desc.weather = field.weather;
     desc.moveType = move.type;
     desc.moveBP = move.bp;
-  } else if (move.named('Brick Break')) {
-    field.defenderSide.isReflect = false;
-    field.defenderSide.isLightScreen = false;
-  }
-
-  const typeEffectivenessPrecedenceRules = [
-    'Normal',
-    'Fire',
-    'Water',
-    'Electric',
-    'Grass',
-    'Ice',
-    'Fighting',
-    'Poison',
-    'Ground',
-    'Flying',
-    'Psychic',
-    'Bug',
-    'Rock',
-    'Ghost',
-    'Dragon',
-    'Dark',
-    'Steel',
-  ];
-
-  let firstDefenderType = defender.types[0];
-  let secondDefenderType = defender.types[1];
-
-  if (secondDefenderType && firstDefenderType !== secondDefenderType) {
-    const firstTypePrecedence = typeEffectivenessPrecedenceRules.indexOf(firstDefenderType);
-    const secondTypePrecedence = typeEffectivenessPrecedenceRules.indexOf(secondDefenderType);
-
-    if (firstTypePrecedence > secondTypePrecedence) {
-      [firstDefenderType, secondDefenderType] = [secondDefenderType, firstDefenderType];
-    }
   }
 
   const type1Effectiveness = getMoveEffectiveness(
     gen,
     move,
-    firstDefenderType,
+    defender.types[0],
     field.defenderSide.isForesight
   );
-  const type2Effectiveness = secondDefenderType
-    ? getMoveEffectiveness(gen, move, secondDefenderType, field.defenderSide.isForesight)
+  const type2Effectiveness = defender.types[1]
+    ? getMoveEffectiveness(gen, move, defender.types[1], field.defenderSide.isForesight)
     : 1;
   const typeEffectiveness = type1Effectiveness * type2Effectiveness;
 
@@ -131,7 +88,7 @@ export function calculateADV(
     return result;
   }
 
-  desc.HPEVs = getStatDescriptionText(gen, defender, 'hp');
+  desc.HPEVs = `${defender.evs.hp} HP`;
 
   const fixedDamage = handleFixedDamageMoves(attacker, move);
   if (fixedDamage) {
@@ -143,73 +100,6 @@ export function calculateADV(
     desc.hits = move.hits;
   }
 
-  let bp = calculateBasePowerADV(attacker, defender, move, desc);
-
-  if (bp === 0) {
-    return result;
-  }
-  bp = calculateBPModsADV(attacker, move, desc, bp);
-
-  const isCritical = move.isCrit && !defender.hasAbility('Battle Armor', 'Shell Armor');
-  const at = calculateAttackADV(gen, attacker, defender, move, desc, isCritical);
-  const df = calculateDefenseADV(gen, defender, move, desc, isCritical);
-
-  const lv = attacker.level;
-  let baseDamage = Math.floor(Math.floor((Math.floor((2 * lv) / 5 + 2) * at * bp) / df) / 50);
-
-  baseDamage = calculateFinalModsADV(baseDamage, attacker, move, field, desc, isCritical);
-
-  baseDamage = Math.floor(baseDamage * typeEffectiveness);
-  result.damage = [];
-  for (let i = 85; i <= 100; i++) {
-    result.damage[i - 85] = Math.max(1, Math.floor((baseDamage * i) / 100));
-  }
-
-  if ((move.dropsStats && move.timesUsed! > 1) || move.hits > 1) {
-    // store boosts so intermediate boosts don't show.
-    const origDefBoost = desc.defenseBoost;
-    const origAtkBoost = desc.attackBoost;
-    let numAttacks = 1;
-    if (move.dropsStats && move.timesUsed! > 1) {
-      desc.moveTurns = `over ${move.timesUsed} turns`;
-      numAttacks = move.timesUsed!;
-    } else {
-      numAttacks = move.hits;
-    }
-    let usedItems = [false, false];
-    for (let times = 1; times < numAttacks; times++) {
-      usedItems = checkMultihitBoost(gen, attacker, defender, move,
-        field, desc, usedItems[0], usedItems[1]);
-      const newAt = calculateAttackADV(gen, attacker, defender, move, desc, isCritical);
-      let newBp = calculateBasePowerADV(attacker, defender, move, desc);
-      newBp = calculateBPModsADV(attacker, move, desc, newBp);
-      let newBaseDmg = Math.floor(
-        Math.floor((Math.floor((2 * lv) / 5 + 2) * newAt * newBp) / df) / 50
-      );
-      newBaseDmg = calculateFinalModsADV(newBaseDmg, attacker, move, field, desc, isCritical);
-      newBaseDmg = Math.floor(newBaseDmg * typeEffectiveness);
-
-      let damageMultiplier = 85;
-      result.damage = result.damage.map(affectedAmount => {
-        const newFinalDamage = Math.max(1, Math.floor((newBaseDmg * damageMultiplier) / 100));
-        damageMultiplier++;
-        return affectedAmount + newFinalDamage;
-      });
-    }
-    desc.defenseBoost = origDefBoost;
-    desc.attackBoost = origAtkBoost;
-  }
-
-  return result;
-}
-
-export function calculateBasePowerADV(
-  attacker: Pokemon,
-  defender: Pokemon,
-  move: Move,
-  desc: RawDesc,
-  hit = 1,
-) {
   let bp = move.bp;
   switch (move.name) {
   case 'Flail':
@@ -234,52 +124,22 @@ export function calculateBasePowerADV(
       desc.moveBP = bp;
     }
     break;
-  case 'Nature Power':
-    move.category = 'Physical';
-    bp = 60;
-    desc.moveName = 'Swift';
-    break;
-  case 'Triple Kick':
-    bp = hit * 10;
-    desc.moveBP = move.hits === 2 ? 30 : move.hits === 3 ? 60 : 10;
-    break;
   default:
     bp = move.bp;
   }
-  return bp;
-}
 
-export function calculateBPModsADV(
-  attacker: Pokemon,
-  move: Move,
-  desc: RawDesc,
-  basePower: number,
-) {
-  if (attacker.curHP() <= attacker.maxHP() / 3 &&
-    ((attacker.hasAbility('Overgrow') && move.hasType('Grass')) ||
-     (attacker.hasAbility('Blaze') && move.hasType('Fire')) ||
-     (attacker.hasAbility('Torrent') && move.hasType('Water')) ||
-     (attacker.hasAbility('Swarm') && move.hasType('Bug')))
-  ) {
-    basePower = Math.floor(basePower * 1.5);
-    desc.attackerAbility = attacker.ability;
+  if (bp === 0) {
+    return result;
   }
-  return basePower;
-}
 
-export function calculateAttackADV(
-  gen: Generation,
-  attacker: Pokemon,
-  defender: Pokemon,
-  move: Move,
-  desc: RawDesc,
-  isCritical = false
-) {
   const isPhysical = move.category === 'Physical';
   const attackStat = isPhysical ? 'atk' : 'spa';
-  desc.attackEVs = getStatDescriptionText(gen, attacker, attackStat, attacker.nature);
+  desc.attackEVs = getEVDescriptionText(gen, attacker, attackStat, attacker.nature);
+  const defenseStat = isPhysical ? 'def' : 'spd';
+  desc.defenseEVs = getEVDescriptionText(gen, defender, defenseStat, defender.nature);
 
   let at = attacker.rawStats[attackStat];
+  let df = defender.rawStats[defenseStat];
 
   if (isPhysical && attacker.hasAbility('Huge Power', 'Pure Power')) {
     at *= 2;
@@ -307,40 +167,6 @@ export function calculateAttackADV(
     desc.attackerItem = attacker.item;
   }
 
-  if (defender.hasAbility('Thick Fat') && (move.hasType('Fire', 'Ice'))) {
-    at = Math.floor(at / 2);
-    desc.defenderAbility = defender.ability;
-  }
-
-  if ((isPhysical &&
-    (attacker.hasAbility('Hustle') || (attacker.hasAbility('Guts') && attacker.status))) ||
-    (!isPhysical && attacker.abilityOn && attacker.hasAbility('Plus', 'Minus'))
-  ) {
-    at = Math.floor(at * 1.5);
-    desc.attackerAbility = attacker.ability;
-  }
-
-  const attackBoost = attacker.boosts[attackStat];
-  if (attackBoost > 0 || (!isCritical && attackBoost < 0)) {
-    at = getModifiedStat(at, attackBoost);
-    desc.attackBoost = attackBoost;
-  }
-  return at;
-}
-
-export function calculateDefenseADV(
-  gen: Generation,
-  defender: Pokemon,
-  move: Move,
-  desc: RawDesc,
-  isCritical = false
-) {
-  const isPhysical = move.category === 'Physical';
-  const defenseStat = isPhysical ? 'def' : 'spd';
-  desc.defenseEVs = getStatDescriptionText(gen, defender, defenseStat, defender.nature);
-
-  let df = defender.rawStats[defenseStat];
-
   if (!isPhysical && defender.hasItem('Soul Dew') && defender.named('Latios', 'Latias')) {
     df = Math.floor(df * 1.5);
     desc.defenderItem = defender.item;
@@ -352,32 +178,50 @@ export function calculateDefenseADV(
     desc.defenderItem = defender.item;
   }
 
-  if (isPhysical && defender.hasAbility('Marvel Scale') && defender.status) {
+  if (defender.hasAbility('Thick Fat') && (move.hasType('Fire', 'Ice'))) {
+    at = Math.floor(at / 2);
+    desc.defenderAbility = defender.ability;
+  } else if (isPhysical && defender.hasAbility('Marvel Scale') && defender.status) {
     df = Math.floor(df * 1.5);
     desc.defenderAbility = defender.ability;
+  }
+
+  if ((isPhysical &&
+        (attacker.hasAbility('Hustle') || (attacker.hasAbility('Guts') && attacker.status))) ||
+      (!isPhysical && attacker.abilityOn && attacker.hasAbility('Plus', 'Minus'))
+  ) {
+    at = Math.floor(at * 1.5);
+    desc.attackerAbility = attacker.ability;
+  } else if (attacker.curHP() <= attacker.maxHP() / 3 &&
+    ((attacker.hasAbility('Overgrow') && move.hasType('Grass')) ||
+     (attacker.hasAbility('Blaze') && move.hasType('Fire')) ||
+     (attacker.hasAbility('Torrent') && move.hasType('Water')) ||
+     (attacker.hasAbility('Swarm') && move.hasType('Bug')))
+  ) {
+    bp = Math.floor(bp * 1.5);
+    desc.attackerAbility = attacker.ability;
   }
 
   if (move.named('Explosion', 'Self-Destruct')) {
     df = Math.floor(df / 2);
   }
 
+  const isCritical = move.isCrit && !defender.hasAbility('Battle Armor', 'Shell Armor');
+
+  const attackBoost = attacker.boosts[attackStat];
   const defenseBoost = defender.boosts[defenseStat];
+  if (attackBoost > 0 || (!isCritical && attackBoost < 0)) {
+    at = getModifiedStat(at, attackBoost);
+    desc.attackBoost = attackBoost;
+  }
   if (defenseBoost < 0 || (!isCritical && defenseBoost > 0)) {
     df = getModifiedStat(df, defenseBoost);
     desc.defenseBoost = defenseBoost;
   }
-  return df;
-}
 
-function calculateFinalModsADV(
-  baseDamage: number,
-  attacker: Pokemon,
-  move: Move,
-  field: Field,
-  desc: RawDesc,
-  isCritical = false,
-) {
-  const isPhysical = move.category === 'Physical';
+  const lv = attacker.level;
+  let baseDamage = Math.floor(Math.floor((Math.floor((2 * lv) / 5 + 2) * at * bp) / df) / 50);
+
   if (attacker.hasStatus('brn') && isPhysical && !attacker.hasAbility('Guts')) {
     baseDamage = Math.floor(baseDamage / 2);
     desc.isBurned = true;
@@ -422,6 +266,7 @@ function calculateFinalModsADV(
   }
 
   baseDamage = (move.category === 'Physical' ? Math.max(1, baseDamage) : baseDamage) + 2;
+
   if (isCritical) {
     baseDamage *= 2;
     desc.isCritical = true;
@@ -429,7 +274,7 @@ function calculateFinalModsADV(
 
   if (move.named('Weather Ball') && field.weather) {
     baseDamage *= 2;
-    desc.moveBP = move.bp * 2;
+    desc.moveBP = bp * 2;
   }
 
   if (field.attackerSide.isHelpingHand) {
@@ -440,5 +285,12 @@ function calculateFinalModsADV(
   if (move.hasType(...attacker.types)) {
     baseDamage = Math.floor(baseDamage * 1.5);
   }
-  return baseDamage;
+
+  baseDamage = Math.floor(baseDamage * typeEffectiveness);
+  result.damage = [];
+  for (let i = 85; i <= 100; i++) {
+    result.damage[i - 85] = Math.max(1, Math.floor((baseDamage * i) / 100));
+  }
+
+  return result;
 }

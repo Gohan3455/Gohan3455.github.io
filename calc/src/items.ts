@@ -1,7 +1,7 @@
-import type {Generation, TypeName, StatID} from './data/interface';
+import {Generation, TypeName, StatName} from './data/interface';
 import {toID} from './util';
 
-export const SEED_BOOSTED_STAT: {[item: string]: StatID} = {
+export const SEED_BOOSTED_STAT: {[item: string]: StatName} = {
   'Electric Seed': 'def',
   'Grassy Seed': 'def',
   'Misty Seed': 'spd',
@@ -42,7 +42,6 @@ export function getItemBoostType(item: string | undefined) {
   case 'Odd Incense':
   case 'Twisted Spoon':
     return 'Psychic';
-  case 'Fairy Feather':
   case 'Pixie Plate':
     return 'Fairy';
   case 'Sky Plate':
@@ -377,7 +376,7 @@ const FLING_10 = new Set([
 // TODO: move this data to the data files instead.
 export function getFlingPower(item?: string) {
   if (!item) return 0;
-  if (['Big Nugget', 'Iron Ball', 'TR43', 'TR71'].includes(item)) return 130;
+  if (['Iron Ball', 'TR43', 'TR71'].includes(item)) return 130;
   if (FLING_120.has(item)) return 85;
   if (['TR03', 'TR06', 'TR09', 'TR15', 'TR89'].includes(item)) return 110;
   if (FLING_100.has(item)) return 100;

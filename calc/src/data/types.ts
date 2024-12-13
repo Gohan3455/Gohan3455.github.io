@@ -1,4 +1,4 @@
-import type * as I from './interface';
+import * as I from './interface';
 import {toID, extend} from '../util';
 
 export type TypeChart = {
@@ -406,32 +406,7 @@ const SM = XY;
 
 const SS = SM;
 
-const SV: TypeChart = extend(true, {}, SS, {
-  '???': {Stellar: 1},
-  Normal: {Stellar: 1},
-  Grass: {Stellar: 1},
-  Fire: {Stellar: 1},
-  Water: {Stellar: 1},
-  Electric: {Stellar: 1},
-  Ice: {Stellar: 1},
-  Flying: {Stellar: 1},
-  Bug: {Stellar: 1},
-  Poison: {Stellar: 1},
-  Ground: {Stellar: 1},
-  Rock: {Stellar: 1},
-  Fighting: {Stellar: 1},
-  Psychic: {Stellar: 1},
-  Ghost: {Stellar: 1},
-  Dragon: {Stellar: 1},
-  Dark: {Stellar: 1},
-  Steel: {Stellar: 1},
-  Fairy: {Stellar: 1},
-  Stellar: {
-    '???': 1,
-  },
-});
-
-export const TYPE_CHART = [{}, RBY, GSC, ADV, DPP, BW, XY, SM, SS, SV];
+export const TYPE_CHART = [{}, RBY, GSC, ADV, DPP, BW, XY, SM, SS];
 
 export class Types implements I.Types {
   private readonly gen: I.GenerationNum;

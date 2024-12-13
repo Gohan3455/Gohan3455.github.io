@@ -1,5 +1,5 @@
-import type * as I from './data/interface';
-import type {State} from './state';
+import * as I from './data/interface';
+import {State} from './state';
 import {toID, extend} from './util';
 
 const SPECIAL = ['Fire', 'Water', 'Grass', 'Electric', 'Ice', 'Psychic', 'Dark', 'Dragon'];
@@ -30,19 +30,14 @@ export class Move implements State.Move {
   mindBlownRecoil: boolean;
   struggleRecoil: boolean;
   isCrit: boolean;
-  isStellarFirstUse: boolean;
   drain?: [number, number];
   priority: number;
   dropsStats?: number;
   ignoreDefensive: boolean;
-  overrideOffensiveStat?: I.StatIDExceptHP;
-  overrideDefensiveStat?: I.StatIDExceptHP;
-  overrideOffensivePokemon?: 'target' | 'source';
-  overrideDefensivePokemon?: 'target' | 'source';
+  defensiveCategory: I.MoveCategory;
   breaksProtect: boolean;
   isZ: boolean;
   isMax: boolean;
-  multiaccuracy: boolean;
 
   constructor(
     gen: I.Generation,
@@ -62,7 +57,6 @@ export class Move implements State.Move {
     if (options.useMax && data.maxMove) {
       const maxMoveName: string = getMaxMoveName(
         data.type,
-        data.name,
         options.species,
         !!(data.category === 'Status'),
         options.ability
@@ -95,18 +89,14 @@ export class Move implements State.Move {
       });
     } else {
       if (data.multihit) {
-        if (data.multiaccuracy && typeof data.multihit === 'number') {
-          this.hits = options.hits || data.multihit;
+        if (typeof data.multihit === 'number') {
+          this.hits = data.multihit;
+        } else if (options.hits) {
+          this.hits = options.hits;
         } else {
-          if (typeof data.multihit === 'number') {
-            this.hits = data.multihit;
-          } else if (options.hits) {
-            this.hits = options.hits;
-          } else {
-            this.hits = (options.ability === 'Skill Link')
-              ? data.multihit[1]
-              : data.multihit[0] + 1;
-          }
+          this.hits = (options.ability === 'Skill Link' || options.item === 'Grip Claw')
+            ? data.multihit[1]
+            : data.multihit[0] + 1;
         }
       }
       this.timesUsedWithMetronome = options.timesUsedWithMetronome;
@@ -145,26 +135,25 @@ export class Move implements State.Move {
     this.isCrit = !!options.isCrit || !!data.willCrit ||
       // These don't *always* crit (255/256 chance), but for the purposes of the calc they do
       gen.num === 1 && ['crabhammer', 'razorleaf', 'slash', 'karate chop'].includes(data.id);
-    this.isStellarFirstUse = !!options.isStellarFirstUse;
     this.drain = data.drain;
     this.flags = data.flags;
     // The calc doesn't currently care about negative priority moves so we simply default to 0
     this.priority = data.priority || 0;
 
     this.ignoreDefensive = !!data.ignoreDefensive;
-    this.overrideOffensiveStat = data.overrideOffensiveStat;
-    this.overrideDefensiveStat = data.overrideDefensiveStat;
-    this.overrideOffensivePokemon = data.overrideOffensivePokemon;
-    this.overrideDefensivePokemon = data.overrideDefensivePokemon;
+    this.defensiveCategory = data.defensiveCategory || this.category;
     this.breaksProtect = !!data.breaksProtect;
     this.isZ = !!data.isZ;
     this.isMax = !!data.isMax;
-    this.multiaccuracy = !!data.multiaccuracy;
 
     if (!this.bp) {
       // Assume max happiness for these moves because the calc doesn't support happiness
       if (['return', 'frustration', 'pikapapow', 'veeveevolley'].includes(data.id)) {
         this.bp = 102;
+      } else if (data.id === 'naturepower') {
+        // Assume the 'Wi-Fi' default of Tri Attack
+        this.bp = 80;
+        if (gen.num >= 5) this.secondaries = true;
       }
     }
   }
@@ -185,7 +174,6 @@ export class Move implements State.Move {
       useZ: this.useZ,
       useMax: this.useMax,
       isCrit: this.isCrit,
-      isStellarFirstUse: this.isStellarFirstUse,
       hits: this.hits,
       timesUsed: this.timesUsed,
       timesUsedWithMetronome: this.timesUsedWithMetronome,
@@ -247,7 +235,6 @@ const ZMOVES_TYPING: {
 
 export function getMaxMoveName(
   moveType: I.TypeName,
-  moveName?: string,
   pokemonSpecies?: string,
   isStatus?: boolean,
   pokemonAbility?: string
@@ -263,12 +250,10 @@ export function getMaxMoveName(
     if (pokemonSpecies === 'Eevee-Gmax') return 'G-Max Cuddle';
     if (pokemonSpecies === 'Meowth-Gmax') return 'G-Max Gold Rush';
     if (pokemonSpecies === 'Snorlax-Gmax') return 'G-Max Replenish';
-    if (!(moveName === 'Weather Ball' || moveName === 'Terrain Pulse')) {
-      if (pokemonAbility === 'Pixilate') return 'Max Starfall';
-      if (pokemonAbility === 'Aerilate') return 'Max Airstream';
-      if (pokemonAbility === 'Refrigerate') return 'Max Hailstorm';
-      if (pokemonAbility === 'Galvanize') return 'Max Lightning';
-    }
+    if (pokemonAbility === 'Pixilate') return 'Max Starfall';
+    if (pokemonAbility === 'Aerilate') return 'Max Airstream';
+    if (pokemonAbility === 'Refrigerate') return 'Max Hailstorm';
+    if (pokemonAbility === 'Galvanize') return 'Max Lightning';
   }
   if (moveType === 'Fairy') {
     if (pokemonSpecies === 'Alcremie-Gmax') return 'G-Max Finale';

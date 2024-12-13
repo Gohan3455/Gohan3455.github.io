@@ -1,10 +1,9 @@
 export interface As<T> {__brand: T}
 export type ID = (string & As<'ID'>) | (string & { __isID: true }) | '';
-export type GenerationNum = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+export type GenerationNum = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type GenderName = 'M' | 'F' | 'N';
-export type StatID = 'hp' | StatIDExceptHP;
-export type StatIDExceptHP = 'atk' | 'def' | 'spa' | 'spd' | 'spe';
-export type StatsTable<T = number> = {[stat in StatID]: T};
+export type StatName = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
+export type StatsTable<T = number> = {[stat in StatName]: T};
 
 export type AbilityName = string & As<'AbilityName'>;
 export type ItemName = string & As<'ItemName'>;
@@ -16,7 +15,7 @@ export type StatusName = 'slp' | 'psn' | 'brn' | 'frz' | 'par' | 'tox';
 export type GameType = 'Singles' | 'Doubles';
 export type Terrain = 'Electric' | 'Grassy' | 'Psychic' | 'Misty';
 export type Weather =
-  | 'Sand' | 'Sun' | 'Rain' | 'Hail' | 'Snow' | 'Harsh Sunshine' | 'Heavy Rain' | 'Strong Winds';
+  | 'Sand' | 'Sun' | 'Rain' | 'Hail' | 'Harsh Sunshine' | 'Heavy Rain' | 'Strong Winds' | 'Rain Dance' | 'Sunny Day';
 
 export type NatureName =
   'Adamant' | 'Bashful' | 'Bold' | 'Brave' | 'Calm' |
@@ -27,8 +26,7 @@ export type NatureName =
 
 export type TypeName =
   'Normal' | 'Fighting' | 'Flying' | 'Poison' | 'Ground' | 'Rock' | 'Bug' | 'Ghost' | 'Steel' |
-  'Fire' | 'Water' | 'Grass' | 'Electric' | 'Psychic' | 'Ice' | 'Dragon' | 'Dark' | 'Fairy' |
-  'Stellar' | '???';
+  'Fire' | 'Water' | 'Grass' | 'Electric' | 'Psychic' | 'Ice' | 'Dragon' | 'Dark' | 'Fairy' | '???';
 
 export type MoveCategory = 'Physical' | 'Special' | 'Status';
 
@@ -89,12 +87,11 @@ export interface MoveFlags {
   contact?: 1 | 0;
   bite?: 1 | 0;
   sound?: 1 | 0;
+  blade?: 1 | 0;
   // TODO: heal?: 1 | 0;
   punch?: 1 | 0;
   bullet?: 1 | 0;
   pulse?: 1 | 0;
-  slicing?: 1 | 0;
-  wind?: 1| 0;
 }
 
 export interface SelfOrSecondaryEffect {
@@ -118,10 +115,7 @@ export interface Move extends Data<MoveName> {
   readonly priority?: number;
   readonly self?: SelfOrSecondaryEffect | null;
   readonly ignoreDefensive?: boolean;
-  readonly overrideOffensiveStat?: StatIDExceptHP;
-  readonly overrideDefensiveStat?: StatIDExceptHP;
-  readonly overrideOffensivePokemon?: 'target' | 'source';
-  readonly overrideDefensivePokemon?: 'target' | 'source';
+  readonly defensiveCategory?: MoveCategory;
   readonly breaksProtect?: boolean;
   readonly isZ?: boolean | string;
   readonly zMove?: {
@@ -132,7 +126,6 @@ export interface Move extends Data<MoveName> {
     basePower: number;
   };
   readonly multihit?: number | number[];
-  readonly multiaccuracy?: boolean;
 }
 
 export interface Species {
@@ -171,6 +164,6 @@ export interface Natures {
 
 export interface Nature extends Data<NatureName> {
   readonly kind: 'Nature';
-  readonly plus?: StatID;
-  readonly minus?: StatID;
+  readonly plus?: StatName;
+  readonly minus?: StatName;
 }
